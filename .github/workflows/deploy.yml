@@ -1,0 +1,28 @@
+name: Deploy Static Site
+
+on:
+  push:
+    branches:
+      - main # Change this if your deployment branch is different
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        run: |
+          rsync -avz --delete -e "ssh" ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/${{ secrets.SITE_NAME }}
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo chown -R www-data:www-data /var/www/${{ secrets.SITE_NAME }} && sudo systemctl restart nginx"
